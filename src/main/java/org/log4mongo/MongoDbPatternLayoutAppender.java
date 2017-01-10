@@ -75,7 +75,7 @@ public class MongoDbPatternLayoutAppender extends MongoDbAppender {
 
             if (bson != null) {
                 try {
-                    getCollection().insert(bson);
+                    getCollection().insertOne(bson);
                 } catch (MongoException e) {
                     errorHandler.error("Failed to insert document to MongoDB", e,
                             ErrorCode.WRITE_FAILURE);

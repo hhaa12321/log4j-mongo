@@ -17,19 +17,21 @@
 
 package org.log4mongo;
 
-import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.log4j.spi.ErrorCode;
+import org.log4mongo.BsonAppender;
 
-import com.mongodb.DB;
-import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
-import com.mongodb.Mongo;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
 import com.mongodb.MongoException;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 
 /**
  * Log4J Appender that writes log events into a MongoDB document oriented database. Log events are
@@ -59,8 +61,8 @@ public class MongoDbAppender extends BsonAppender {
     private String userName = null;
     private String password = null;
     private String writeConcern = null;
-    private Mongo mongo = null;
-    private DBCollection collection = null;
+    private MongoClient mongo = null;
+    private MongoCollection<DBObject> collection = null;
 
     private boolean initialized = false;
 
@@ -85,18 +87,14 @@ public class MongoDbAppender extends BsonAppender {
             List<ServerAddress> addresses = getServerAddresses(hostname, port);
             mongo = getMongo(addresses);
 
-            DB database = getDatabase(mongo, databaseName);
-
+            MongoDatabase database = getDatabase(mongo, databaseName);
+            
             if (userName != null && userName.trim().length() > 0) {
-                if (!database.authenticate(userName, password.toCharArray())) {
-                    throw new RuntimeException("Unable to authenticate with MongoDB server.");
-                }
-
                 // Allow password to be GCed
                 password = null;
             }
 
-            setCollection(database.getCollection(collectionName));
+            setCollection(database.getCollection(collectionName, DBObject.class));
             initialized = true;
         } catch (Exception e) {
             errorHandler.error("Unexpected exception while initialising MongoDbAppender.", e,
@@ -107,21 +105,33 @@ public class MongoDbAppender extends BsonAppender {
     /*
      * This method could be overridden to provide the DB instance from an existing connection.
      */
-    protected DB getDatabase(Mongo mongo, String databaseName) {
-        return mongo.getDB(databaseName);
+    protected MongoDatabase getDatabase(MongoClient mongo, String databaseName) {
+        return mongo.getDatabase(databaseName);
     }
 
     /*
      * This method could be overridden to provide the Mongo instance from an existing connection.
      */
-    protected Mongo getMongo(List<ServerAddress> addresses) {
-        if (addresses.size() < 2) {
-            return new Mongo(addresses.get(0));
-        } else {
-            // Replica set
-            return new Mongo(addresses);
-        }
-    }
+	protected MongoClient getMongo(List<ServerAddress> addresses) {
+		if (userName != null && userName.trim().length() > 0) {
+			MongoCredential credential = MongoCredential.createCredential(userName, databaseName,
+					password.toCharArray());
+			if (addresses.size() < 2) {
+				return new MongoClient(addresses.get(0), Arrays.asList(credential));
+			} else {
+				// Replica set
+				return new MongoClient(addresses, Arrays.asList(credential));
+			}
+		} else {
+			if (addresses.size() < 2) {
+				return new MongoClient(addresses.get(0));
+			} else {
+				// Replica set
+				return new MongoClient(addresses);
+			}
+		}
+
+	}
     
     /**
      * Note: this method is primarily intended for use by the unit tests.
@@ -129,7 +139,7 @@ public class MongoDbAppender extends BsonAppender {
      * @param collection
      *            The MongoDB collection to use when logging events.
      */
-    public void setCollection(final DBCollection collection) {
+    public void setCollection(final MongoCollection<DBObject> collection) {
         assert collection != null : "collection must not be null";
         
         this.collection = collection;
@@ -274,7 +284,7 @@ public class MongoDbAppender extends BsonAppender {
     public void append(DBObject bson) {
         if (initialized && bson != null) {
             try {
-                getCollection().insert(bson, getConcern());
+                getCollection().insertOne(bson);
             } catch (MongoException e) {
                 errorHandler.error("Failed to insert document to MongoDB", e,
                         ErrorCode.WRITE_FAILURE);
@@ -296,7 +306,7 @@ public class MongoDbAppender extends BsonAppender {
      * 
      * @return The MongoDB collection to which events are logged.
      */
-    protected DBCollection getCollection() {
+    protected MongoCollection<DBObject> getCollection() {
         return collection;
     }
 
@@ -341,7 +351,7 @@ public class MongoDbAppender extends BsonAppender {
                     int portNum = (onePort) ? portNums.get(0) : portNums.get(i);
                     try {
                         addresses.add(new ServerAddress(host.trim(), portNum));
-                    } catch (UnknownHostException e) {
+                    } catch (Exception e) {
                         errorHandler.error(
                                 "MongoDB appender hostname property contains unknown host", e,
                                 ErrorCode.ADDRESS_PARSE_FAILURE);
