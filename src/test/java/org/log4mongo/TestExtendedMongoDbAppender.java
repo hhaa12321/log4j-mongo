@@ -16,10 +16,11 @@
 
 package org.log4mongo;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.BasicDBObjectBuilder;
-import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
-import com.mongodb.Mongo;
+import com.mongodb.MongoClient;
+import com.mongodb.client.MongoCollection;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 import org.apache.log4j.PropertyConfigurator;
@@ -51,46 +52,46 @@ public class TestExtendedMongoDbAppender {
     private final static String LOG4J_PROPS = "src/test/resources/log4j_extended.properties";
     //private final static String LOG4J_PROPS = "src/test/resources/log4j_extended.xml";
 
-    private final Mongo mongo;
+    private final MongoClient mongoClient;
     private final ExtendedMongoDbAppender appender;
-    private DBCollection collection;
+    private MongoCollection<DBObject> collection;
 
     public TestExtendedMongoDbAppender() throws Exception {
         PropertyConfigurator.configure(LOG4J_PROPS);
-        mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        mongoClient = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
         appender = (ExtendedMongoDbAppender) Logger.getRootLogger().getAppender(
                 MONGODB_APPENDER_NAME);
     }
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME,
+        MongoClient mongoClient = new MongoClient(TEST_MONGO_SERVER_HOSTNAME,
                 TEST_MONGO_SERVER_PORT);
-        mongo.dropDatabase(TEST_DATABASE_NAME);
+        mongoClient.dropDatabase(TEST_DATABASE_NAME);
     }
 
     @AfterClass
     public static void tearDownAfterClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME,
+        MongoClient mongoClient = new MongoClient(TEST_MONGO_SERVER_HOSTNAME,
                 TEST_MONGO_SERVER_PORT);
-        mongo.dropDatabase(TEST_DATABASE_NAME);
+        mongoClient.dropDatabase(TEST_DATABASE_NAME);
     }
 
     @Before
     public void setUp() throws Exception {
         // Ensure both the appender and the JUnit test use the same collection
         // object - provides consistency across reads (JUnit) & writes (Log4J)
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(
-                TEST_COLLECTION_NAME);
+        collection = mongoClient.getDatabase(TEST_DATABASE_NAME).getCollection(
+                TEST_COLLECTION_NAME, DBObject.class);
         collection.drop();
         appender.setCollection(collection);
 
-        mongo.getDB(TEST_DATABASE_NAME).requestStart();
+//        mongoClient.getDB(TEST_DATABASE_NAME).requestStart();
     }
 
     @After
     public void tearDown() throws Exception {
-        mongo.getDB(TEST_DATABASE_NAME).requestDone();
+//        mongoClient.getDB(TEST_DATABASE_NAME).requestDone();
     }
 
     @Test
@@ -116,7 +117,7 @@ public class TestExtendedMongoDbAppender {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertEquals("Testing Object in Message: {key1=value1, key2=value2}", entry.get("message"));
@@ -128,12 +129,12 @@ public class TestExtendedMongoDbAppender {
 
         log.warn("Testing Object in Message");
 
-        long appNameCount = countLogEntriesWhere(BasicDBObjectBuilder.start().add("applicationName", "MyProject").get());
+        long appNameCount = countLogEntriesWhere((BasicDBObject) BasicDBObjectBuilder.start().add("applicationName", "MyProject").get());
 
         assertEquals(1L, appNameCount);
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("Development", entry.get("eventType"));
     }
@@ -150,7 +151,7 @@ public class TestExtendedMongoDbAppender {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertEquals("Testing MDC Properties", entry.get("message"));
@@ -165,15 +166,15 @@ public class TestExtendedMongoDbAppender {
     // Private methods
     //-----------------------------------------------------------------------//
     private long countLogEntries() {
-        return (collection.getCount());
+        return (collection.count());
     }
 
     private long countLogEntriesAtLevel(final String level) {
-        return (countLogEntriesWhere(BasicDBObjectBuilder.start().add("level",
+        return (countLogEntriesWhere((BasicDBObject) BasicDBObjectBuilder.start().add("level",
                 level.toUpperCase()).get()));
     }
 
-    private long countLogEntriesWhere(final DBObject whereClause) {
-        return collection.getCount(whereClause);
+    private long countLogEntriesWhere(final BasicDBObject whereClause) {
+        return collection.count(whereClause);
     }
 }

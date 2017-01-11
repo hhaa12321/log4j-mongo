@@ -20,20 +20,16 @@ import static org.junit.Assert.*;
 import java.net.InetAddress;
 import java.util.Properties;
 
+import com.mongodb.*;
+import com.mongodb.client.MongoCollection;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
+import org.bson.conversions.Bson;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
-import com.mongodb.BasicDBObjectBuilder;
-import com.mongodb.DBCollection;
-import com.mongodb.DBObject;
-import com.mongodb.Mongo;
 
 /**
  * JUnit unit tests for PatternLayout style logging.
@@ -56,22 +52,22 @@ public class TestMongoDbPatternLayout {
 
     private static final String APPENDER_NAME = "MongoDBPatternLayout";
 
-    private final Mongo mongo;
-    private DBCollection collection;
+    private final MongoClient mongo;
+    private MongoCollection<DBObject> collection;
 
     public TestMongoDbPatternLayout() throws Exception {
-        mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
     }
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        Mongo mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
         mongo.dropDatabase(TEST_DATABASE_NAME);
     }
 
     @AfterClass
     public static void tearDownAfterClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        Mongo mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
         mongo.dropDatabase(TEST_DATABASE_NAME);
     }
 
@@ -79,15 +75,14 @@ public class TestMongoDbPatternLayout {
     public void setUp() throws Exception {
         // Ensure both the appender and the JUnit test use the same collection
         // object - provides consistency across reads (JUnit) & writes (Log4J)
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         collection.drop();
 
-        mongo.getDB(TEST_DATABASE_NAME).requestStart();
     }
 
     @After
     public void tearDown() throws Exception {
-        mongo.getDB(TEST_DATABASE_NAME).requestDone();
+        mongo.close();
     }
 
     @Test
@@ -97,7 +92,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -106,7 +101,7 @@ public class TestMongoDbPatternLayout {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertEquals("Warn entry", entry.get("message"));
@@ -121,7 +116,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -131,7 +126,7 @@ public class TestMongoDbPatternLayout {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertEquals(msg, entry.get("message"));
@@ -144,7 +139,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -154,7 +149,7 @@ public class TestMongoDbPatternLayout {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         DBObject nestedDoc = (DBObject) entry.get("nested");
@@ -172,7 +167,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -182,7 +177,7 @@ public class TestMongoDbPatternLayout {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         BasicDBList list = (BasicDBList) entry.get("array");
@@ -198,7 +193,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -208,7 +203,7 @@ public class TestMongoDbPatternLayout {
         assertEquals(1L, countLogEntriesAtLevel("WARN"));
 
         // verify log entry content
-        DBObject entry = collection.findOne();
+        DBObject entry = collection.find().limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertNotNull(entry.get("host"));
@@ -227,7 +222,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         assertEquals(0L, countLogEntries());
@@ -244,14 +239,14 @@ public class TestMongoDbPatternLayout {
         // verify log entry content
         DBObject queryObj = new BasicDBObject();
         queryObj.put("level", "WARN");
-        DBObject entry = collection.findOne(queryObj);
+        DBObject entry = collection.find((Bson) queryObj).limit(1).first();
         assertNotNull(entry);
         assertEquals("WARN", entry.get("level"));
         assertEquals(msg, entry.get("message"));
 
         queryObj = new BasicDBObject();
         queryObj.put("level", "INFO");
-        entry = collection.findOne(queryObj);
+        entry = collection.find((Bson) queryObj).limit(1).first();
         assertNotNull(entry);
         assertEquals("INFO", entry.get("level"));
         assertEquals(msgDoubleBackslash, entry.get("message"));
@@ -264,7 +259,7 @@ public class TestMongoDbPatternLayout {
         MongoDbAppender appender = (MongoDbAppender) Logger.getRootLogger().getAppender(
                 APPENDER_NAME);
 
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         appender.setCollection(collection);
 
         int NUM_MESSAGES = 1000;
@@ -279,7 +274,7 @@ public class TestMongoDbPatternLayout {
     }
 
     private long countLogEntries() {
-        return (collection.getCount());
+        return (collection.count());
     }
 
     private long countLogEntriesAtLevel(final String level) {
@@ -288,7 +283,7 @@ public class TestMongoDbPatternLayout {
     }
 
     private long countLogEntriesWhere(final DBObject whereClause) {
-        return collection.getCount(whereClause);
+        return collection.count((Bson) whereClause);
     }
 
     private Properties getValidPatternLayoutProperties() {
