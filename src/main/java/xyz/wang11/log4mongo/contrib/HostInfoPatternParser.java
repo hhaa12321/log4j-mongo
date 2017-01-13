@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package org.log4mongo.contrib;
+package xyz.wang11.log4mongo.contrib;
 
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;

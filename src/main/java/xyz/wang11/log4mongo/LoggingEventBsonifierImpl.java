@@ -15,7 +15,7 @@
  *
  */
 
-package org.log4mongo;
+package xyz.wang11.log4mongo;
 
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;

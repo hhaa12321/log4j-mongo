@@ -15,11 +15,11 @@
  *
  */
 
-package org.log4mongo.contrib;
+package xyz.wang11.log4mongo.contrib;
 
 import org.apache.log4j.helpers.PatternParser;
 
-import org.log4mongo.MongoDbPatternLayout;
+import xyz.wang11.log4mongo.MongoDbPatternLayout;
 
 public class HostInfoPatternLayout extends MongoDbPatternLayout {
 

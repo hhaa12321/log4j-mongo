@@ -15,7 +15,7 @@
  *
  */
 
-package org.log4mongo;
+package xyz.wang11.log4mongo;
 
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.helpers.PatternConverter;

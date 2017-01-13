@@ -1,4 +1,4 @@
-package org.log4mongo;
+package xyz.wang11.log4mongo;
 
 import static org.junit.Assert.assertEquals;
 

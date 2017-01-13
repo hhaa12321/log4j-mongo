@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 
-package org.log4mongo;
+package xyz.wang11.log4mongo;
 
+import com.mongodb.*;
+import com.mongodb.client.MongoCollection;
 import org.apache.log4j.PropertyConfigurator;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -23,15 +25,16 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.mongodb.DBCollection;
-import com.mongodb.Mongo;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Authentication-related JUnit unit tests for MongoDbAppender.
- * 
+ * <p>
  * Note: these tests require that a MongoDB server is running, and (by default) assumes that server
  * is listening on the default port (27017) on localhost.
- * 
+ *
  * @author Robert Stewart (robert@wombatnation.com)
  */
 public class TestMongoDbAppenderAuth {
@@ -45,22 +48,22 @@ public class TestMongoDbAppenderAuth {
     private final static String username = "open";
     private final static String password = "sesame";
 
-    private final Mongo mongo;
-    private DBCollection collection;
+    private final MongoClient mongo;
+    private MongoCollection<DBObject> collection;
 
     public TestMongoDbAppenderAuth() throws Exception {
-        mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
     }
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        Mongo mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
         mongo.dropDatabase(TEST_DATABASE_NAME);
     }
 
     @AfterClass
     public static void tearDownAfterClass() throws Exception {
-        Mongo mongo = new Mongo(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
+        Mongo mongo = new MongoClient(TEST_MONGO_SERVER_HOSTNAME, TEST_MONGO_SERVER_PORT);
         mongo.dropDatabase(TEST_DATABASE_NAME);
     }
 
@@ -69,33 +72,36 @@ public class TestMongoDbAppenderAuth {
         // Ensure both the appender and the JUnit test use the same
         // collection object - provides consistency across reads (JUnit) &
         // writes (Log4J)
-        collection = mongo.getDB(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME);
+        collection = mongo.getDatabase(TEST_DATABASE_NAME).getCollection(TEST_COLLECTION_NAME, DBObject.class);
         collection.drop();
 
-        mongo.getDB(TEST_DATABASE_NAME).requestStart();
     }
 
     @After
     public void tearDown() throws Exception {
-        mongo.getDB(TEST_DATABASE_NAME).requestDone();
+        mongo.close();
     }
 
     /**
-     * Catching the RuntimeException thrown when Log4J calls the MongoDbAppender activeOptions()
-     * method isn't easy, since it is thrown in another thread.
-     */
-    @Test(expected = RuntimeException.class)
-    @Ignore
-    public void testAppenderActivateNoAuth() {
-        PropertyConfigurator.configure(LOG4J_AUTH_PROPS);
-    }
-
-    /**
+     * { createUser: "<name>",
+     * pwd: "<cleartext password>",
+     * customData: { <any information> },
+     * roles: [
+     * { role: "<role>", db: "<database>" } | "<role>",
+     * ...
+     * ],
+     * writeConcern: { <write concern> }
+     * }
      * Adds the user to the test database before activating the appender.
+     * mongo.getDB(TEST_DATABASE_NAME).addUser(username, password.toCharArray());
      */
     @Test
     public void testAppenderActivateWithAuth() {
-        mongo.getDB(TEST_DATABASE_NAME).addUser(username, password.toCharArray());
+        mongo.getDatabase(TEST_DATABASE_NAME).runCommand(
+                new BasicDBObject().append("dropUser", username));
+        mongo.getDatabase(TEST_DATABASE_NAME).runCommand(
+                new BasicDBObject().append("createUser", username)
+                        .append("pwd", password).append("roles", Collections.singleton("readWrite")));
         PropertyConfigurator.configure(LOG4J_AUTH_PROPS);
     }
 
