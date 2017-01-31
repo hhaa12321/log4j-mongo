@@ -1,7 +1,7 @@
 Log4mongo-java
 ================
 
-[Source code on GitHub](https://github.com/hhaa12321/log4mongo-java)
+[Source code on GitHub](https://github.com/hhaa12321/log4j-mongo)
 
 # Description
 In order to support Mongo 3.0+. I fork this library from [log4mongo/log4mongo-java](https://github.com/log4mongo/log4mongo-java).
